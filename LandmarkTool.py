@@ -1,6 +1,10 @@
+import ast
+
 from slicer.ScriptedLoadableModule import *
+
 from SlicerDevelopmentToolboxUtils.mixins import *
 from SlicerDevelopmentToolboxUtils.widgets import TargetCreationWidget
+from SlicerDevelopmentToolboxUtils.buttons import *
 
 
 class LandmarkTool(ScriptedLoadableModule):
@@ -20,7 +24,7 @@ class LandmarkTool(ScriptedLoadableModule):
     self.parent.acknowledgementText = """
     This work was supported in part by the National Cancer Institute funding to the
     Quantitative Image Informatics for Cancer Research (QIICR) (U24 CA180918).
-    """ # replace with organization, grant and thanks.
+    """
 
 
 class LandmarkToolWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
@@ -30,7 +34,6 @@ class LandmarkToolWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
 
   def __init__(self, parent=None):
     ScriptedLoadableModuleWidget.__init__(self, parent)
-    # self.setup()
 
   def cleanup(self):
     pass
@@ -43,6 +46,11 @@ class LandmarkToolWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
 
   def setup(self):
     ScriptedLoadableModuleWidget.setup(self)
+    self.setupViewSettingGroupBox()
+
+    self.createSliceWidgetClassMembers("Red")
+    self.createSliceWidgetClassMembers("Yellow")
+
     self.preopTargetTable = TargetCreationWidget()
     self.preopTargetTable.targetListSelectorVisible = True
 
@@ -55,6 +63,29 @@ class LandmarkToolWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
     self.layout.addStretch(1)
     self.setupConnections()
 
+  def setupViewSettingGroupBox(self):
+    self.sideBySideLayoutButton = SideBySideLayoutButton()
+    self.layoutButtons = [self.sideBySideLayoutButton]
+    self.crosshairButton = CrosshairButton()
+    self.wlEffectsToolButton = WindowLevelEffectsButton()
+
+    viewSettingButtons = [self.sideBySideLayoutButton, self.crosshairButton, self.wlEffectsToolButton]
+
+    self.layout.addWidget(self.createHLayout(viewSettingButtons))
+
   def setupConnections(self):
-    # self.preopTargetTable.addEventObserver(t.TargetSelectedEvent, onTargetSelected)
-    pass
+    self.preopTargetTable.addEventObserver(self.preopTargetTable.TargetSelectedEvent, self.onTargetSelected)
+    self.intraopTargetTable.addEventObserver(self.intraopTargetTable.TargetSelectedEvent, self.onTargetSelected)
+
+  @vtk.calldata_type(vtk.VTK_STRING)
+  def onTargetSelected(self, caller, event, callData):
+    info = ast.literal_eval(callData)
+    node = slicer.mrmlScene.GetNodeByID(info["nodeID"])
+    index = info["index"]
+
+    if node is self.preopTargetTable.currentNode:
+      sliceNode = self.redSliceNode
+    else:
+      sliceNode = self.yellowSliceNode
+
+    self.jumpSliceNodeToTarget(sliceNode, node, index)

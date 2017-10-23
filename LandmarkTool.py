@@ -57,8 +57,7 @@ class LandmarkToolWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
     self.intraopTargetTable = TargetCreationWidget()
     self.intraopTargetTable.targetListSelectorVisible = True
 
-    self.layout.addWidget(self.preopTargetTable)
-    self.layout.addWidget(self.intraopTargetTable)
+    self.layout.addWidget(self.createHLayout([self.preopTargetTable, self.intraopTargetTable]))
 
     self.layout.addStretch(1)
     self.setupConnections()
@@ -66,10 +65,9 @@ class LandmarkToolWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
   def setupViewSettingGroupBox(self):
     self.sideBySideLayoutButton = SideBySideLayoutButton()
     self.layoutButtons = [self.sideBySideLayoutButton]
-    self.crosshairButton = CrosshairButton()
     self.wlEffectsToolButton = WindowLevelEffectsButton()
 
-    viewSettingButtons = [self.sideBySideLayoutButton, self.crosshairButton, self.wlEffectsToolButton]
+    viewSettingButtons = [self.sideBySideLayoutButton, self.wlEffectsToolButton]
 
     self.layout.addWidget(self.createHLayout(viewSettingButtons))
 
@@ -88,10 +86,20 @@ class LandmarkToolWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
 
     if node is self.preopTargetTable.currentNode:
       sliceNode = self.redSliceNode
+      otherTable = self.intraopTargetTable
     else:
       sliceNode = self.yellowSliceNode
+      otherTable = self.preopTargetTable
 
     self.jumpSliceNodeToTarget(sliceNode, node, index)
+
+    self.selectTargetIndexInOtherTable(otherTable, index)
+
+  def selectTargetIndexInOtherTable(self, table, index):
+    if not table.currentNode or index > table.currentNode.GetNumberOfFiducials():
+      return
+
+    table.table.selectRow(index)
 
   @vtk.calldata_type(vtk.VTK_OBJECT)
   def onNodeAdded(self, caller, event, calldata):

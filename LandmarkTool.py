@@ -74,6 +74,9 @@ class LandmarkToolWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
     self.layout.addWidget(self.createHLayout(viewSettingButtons))
 
   def setupConnections(self):
+    # TODO: release connection when reloading module
+    slicer.mrmlScene.AddObserver(slicer.vtkMRMLScene.NodeAddedEvent, self.onNodeAdded)
+
     self.preopTargetTable.addEventObserver(self.preopTargetTable.TargetSelectedEvent, self.onTargetSelected)
     self.intraopTargetTable.addEventObserver(self.intraopTargetTable.TargetSelectedEvent, self.onTargetSelected)
 
@@ -89,3 +92,24 @@ class LandmarkToolWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
       sliceNode = self.yellowSliceNode
 
     self.jumpSliceNodeToTarget(sliceNode, node, index)
+
+  @vtk.calldata_type(vtk.VTK_OBJECT)
+  def onNodeAdded(self, caller, event, calldata):
+    node = calldata
+    if isinstance(node, slicer.vtkMRMLMarkupsFiducialNode):
+      self.applyDefaultTargetDisplayNode(node)
+
+  def applyDefaultTargetDisplayNode(self, targetNode, new=False):
+    displayNode = None if new else targetNode.GetDisplayNode()
+    modifiedDisplayNode = self.setupDisplayNode(displayNode, True)
+    targetNode.SetAndObserveDisplayNodeID(modifiedDisplayNode.GetID())
+
+  def setupDisplayNode(self, displayNode=None, starBurst=False):
+    if not displayNode:
+      displayNode = slicer.vtkMRMLMarkupsDisplayNode()
+      slicer.mrmlScene.AddNode(displayNode)
+    displayNode.SetTextScale(2.5)
+    displayNode.SetGlyphScale(2)
+    if starBurst:
+      displayNode.SetGlyphType(slicer.vtkMRMLAnnotationPointDisplayNode.StarBurst2D)
+    return displayNode

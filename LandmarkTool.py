@@ -46,37 +46,68 @@ class LandmarkToolWidget(ModuleWidgetMixin, ScriptedLoadableModuleWidget):
 
   def setup(self):
     ScriptedLoadableModuleWidget.setup(self)
+
     self.setupViewSettingGroupBox()
 
     self.createSliceWidgetClassMembers("Red")
     self.createSliceWidgetClassMembers("Yellow")
 
+    self.preopVolumeSelector = self.createVolumeSelector()
+    # preopSelector = self.createHLayout([qt.QLabel("Preop Volume:"), self.preopVolumeSelector])
+
     self.preopTargetTable = TargetCreationWidget()
     self.preopTargetTable.targetListSelectorVisible = True
 
+    self.intraopVolumeSelector = self.createVolumeSelector()
+    # intraopSelector = self.createHLayout([qt.QLabel("Intraop Volume:"), self.intraopVolumeSelector])
     self.intraopTargetTable = TargetCreationWidget()
     self.intraopTargetTable.targetListSelectorVisible = True
 
-    self.layout.addWidget(self.createHLayout([self.preopTargetTable, self.intraopTargetTable]))
+
+    self.layout.addWidget(self.createHLayout([self.createVLayout([self.preopVolumeSelector ,self.preopTargetTable]),
+                                              self.createVLayout([self.intraopVolumeSelector , self.intraopTargetTable])]))
 
     self.layout.addStretch(1)
     self.setupConnections()
 
+  def createVolumeSelector(self):
+      return self.createComboBox(nodeTypes=["vtkMRMLScalarVolumeNode", ""], addEnabled=False,
+                                 removeEnabled=True, noneEnabled=True, showChildNodeTypes=False,
+                                 renameEnabled=True, selectNodeUponCreation=True,
+                                 toolTip="Select volume node")
+
   def setupViewSettingGroupBox(self):
     self.sideBySideLayoutButton = SideBySideLayoutButton()
     self.layoutButtons = [self.sideBySideLayoutButton]
-    self.wlEffectsToolButton = WindowLevelEffectsButton()
 
-    viewSettingButtons = [self.sideBySideLayoutButton, self.wlEffectsToolButton]
-
-    self.layout.addWidget(self.createHLayout(viewSettingButtons))
+    self.layout.addWidget(self.createHLayout(self.layoutButtons))
 
   def setupConnections(self):
     # TODO: release connection when reloading module
     slicer.mrmlScene.AddObserver(slicer.vtkMRMLScene.NodeAddedEvent, self.onNodeAdded)
 
+    self.preopVolumeSelector.currentNodeChanged.connect(self.onPreopVolumeChanged)
     self.preopTargetTable.addEventObserver(self.preopTargetTable.TargetSelectedEvent, self.onTargetSelected)
+
+    self.intraopVolumeSelector.currentNodeChanged.connect(self.onIntraopVolumeChanged)
     self.intraopTargetTable.addEventObserver(self.intraopTargetTable.TargetSelectedEvent, self.onTargetSelected)
+
+  def onPreopVolumeChanged(self, node):
+    self.setBackgroundVolume(self.redWidget, node)
+
+  def onIntraopVolumeChanged(self, node):
+    self.setBackgroundVolume(self.yellowWidget, node)
+
+  def setBackgroundVolume(self, widget, node):
+    compositeNode = widget.mrmlSliceCompositeNode()
+    compositeNode.SetBackgroundVolumeID(node.GetID() if node else None)
+    sliceNode = widget.sliceLogic().GetSliceNode()
+    sliceNode.SetOrientationToAxial()
+    sliceNode.RotateToVolumePlane(node)
+    sliceLogic = widget.sliceLogic()
+    sliceLogic.FitSliceToAll()
+    FOV = sliceLogic.GetSliceNode().GetFieldOfView()
+    self.setFOV(sliceLogic, [FOV[0] * .5, FOV[1] * .5, FOV[2]])
 
   @vtk.calldata_type(vtk.VTK_STRING)
   def onTargetSelected(self, caller, event, callData):
